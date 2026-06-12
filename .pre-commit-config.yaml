@@ -1,0 +1,78 @@
+default_language_version:
+  python: python3.12
+
+# Run all hooks on the full codebase (not just staged files) when
+# explicitly triggered via: pre-commit run --all-files
+default_stages: [pre-commit]
+
+repos:
+
+  # ── 1. General file hygiene ──────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace       # strip trailing spaces
+      - id: end-of-file-fixer         # ensure files end with a newline
+      - id: check-yaml                # validate .yaml syntax
+      - id: check-toml                # validate pyproject.toml syntax
+      - id: check-json                # validate any .json files
+      - id: check-added-large-files   # block files > 500 KB from being staged
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict      # catch leftover <<<< merge markers
+      - id: debug-statements          # catch stray breakpoint() / pdb.set_trace()
+      - id: detect-private-key        # block accidental private key commits
+      - id: mixed-line-ending         # enforce LF line endings
+        args: ["--fix=lf"]
+
+  # ── 2. Black — code formatter ────────────────────────────
+  # Black rewrites files in place. If it changes anything the
+  # commit is aborted; you stage the reformatted file and retry.
+  - repo: https://github.com/psf/black
+    rev: 26.5.1
+    hooks:
+      - id: black
+        language_version: python3.12
+
+  # ── 3. isort — import sorter ─────────────────────────────
+  # isort runs after black and uses the "black" profile so their
+  # output is always compatible (both configured in pyproject.toml).
+  - repo: https://github.com/PyCQA/isort
+    rev: 9.0.0a3
+    hooks:
+      - id: isort
+        name: isort (python)
+
+  # ── 4. Flake8 — style & error linter ────────────────────
+  # Flake8 does NOT rewrite files — it only reports. The commit
+  # is blocked until you manually fix the flagged lines.
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.3.0
+    hooks:
+      - id: flake8
+        additional_dependencies:
+          - flake8-bugbear==24.12.12      # catches common bug patterns
+          - flake8-comprehensions==3.16.0  # simplify comprehension style
+          - flake8-simplify==0.21.0        # suggest simpler constructs
+        args:
+          - "--max-line-length=88"   # match black's line length
+          - "--extend-ignore=E203,W503,E501"
+          # E203: whitespace before ':' — black disagrees with PEP8 here
+          # W503: line break before binary op — conflicts with black
+          # E501: line too long — black handles this already
+
+  # ── 5. mypy — static type checker ───────────────────────
+  # mypy runs last because it is the slowest hook. It reads
+  # configuration from pyproject.toml [tool.mypy].
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pydantic==2.11.5
+          - sqlalchemy[mypy]==2.0.41
+          - types-redis==4.6.0.20241004
+        args:
+          - "--config-file=pyproject.toml"
+        # Only run mypy on your source packages, not on tests or scripts
+        # (test files often have untyped fixtures that would flood errors)
+        files: ^(app|core|db|cache|services|workers|schemas)/
