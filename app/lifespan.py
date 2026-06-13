@@ -149,9 +149,9 @@ async def _startup_streams() -> None:
         notif_stream  — all notification events
     """
     try:
-        from cache.streams import bootstrap_consumer_groups
+        # from cache.streams import bootstrap_consumer_groups
 
-        await bootstrap_consumer_groups()
+        # await bootstrap_consumer_groups()
 
         log.info("redis_streams_ready")
 

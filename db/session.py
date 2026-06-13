@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from typing import Optional
 
 import structlog
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncEngine,
@@ -11,7 +12,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy import event, text
 
 from core.config import settings
 
@@ -31,6 +31,7 @@ _async_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
 #  Engine initialisation (called once from lifespan.py on startup)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 async def init_db_engine() -> None:
     """
     Create the async SQLAlchemy engine and session factory.
@@ -49,7 +50,6 @@ async def init_db_engine() -> None:
 
     _engine = create_async_engine(
         str(settings.database_url),
-
         # ── Connection pool ───────────────────────────────────────────────
         # pool_size: number of persistent connections kept open.
         # max_overflow: extra connections allowed above pool_size
@@ -57,26 +57,21 @@ async def init_db_engine() -> None:
         # Total max connections = pool_size + max_overflow.
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,
-
         # pool_timeout: seconds to wait for a connection from the pool
         # before raising TimeoutError.
         pool_timeout=settings.db_pool_timeout,
-
         # pool_recycle: seconds after which a connection is replaced.
         # Prevents "connection already closed" errors caused by
         # PostgreSQL's idle connection timeout or firewalls killing
         # long-lived idle connections.
         pool_recycle=settings.db_pool_recycle,
-
         # pool_pre_ping: before handing a connection to the application,
         # issue a cheap "SELECT 1" to verify it is still alive.
         # Silently replaces dead connections instead of raising errors.
         pool_pre_ping=True,
-
         # echo: log every SQL statement. True in development only.
         # Reads db_echo_sql from the environment-specific settings class.
         echo=getattr(settings, "db_echo_sql", False),
-
         # connect_args: passed directly to asyncpg.
         # command_timeout: max seconds for any single DB operation.
         # server_settings: PostgreSQL session-level settings applied
@@ -112,18 +107,15 @@ async def init_db_engine() -> None:
     _async_session_factory = async_sessionmaker(
         bind=_engine,
         class_=AsyncSession,
-
         # expire_on_commit=False: after session.commit(), ORM objects
         # remain usable without triggering a lazy-load (which would fail
         # in an async context anyway). Routes can safely return committed
         # objects to Pydantic for serialization.
         expire_on_commit=False,
-
         # autobegin=True (default): a transaction begins implicitly on
         # the first database operation. We always commit or rollback
         # explicitly — we never rely on autocommit.
         autobegin=True,
-
         # autoflush=False: do not flush pending changes to the DB before
         # every query. We flush manually where needed. This prevents
         # confusing implicit writes in complex multi-step service functions.
@@ -143,6 +135,7 @@ async def init_db_engine() -> None:
 #  Engine teardown (called from lifespan.py on shutdown)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 async def close_db_engine() -> None:
     """
     Dispose the async engine — closes all pooled connections gracefully.
@@ -159,10 +152,10 @@ async def close_db_engine() -> None:
 
     log.info("db_engine_disposed")
 
-
     # ══════════════════════════════════════════════════════════════════════════════
     #  Public accessors
     # ══════════════════════════════════════════════════════════════════════════════
+
 
 def get_engine() -> AsyncEngine:
     """
@@ -171,9 +164,9 @@ def get_engine() -> AsyncEngine:
     """
     if _engine is None:
         raise RuntimeError(
-    "Database engine has not been initialised. "
-    "Ensure init_db_engine() is called during application startup."
-    )
+            "Database engine has not been initialised. "
+            "Ensure init_db_engine() is called during application startup."
+        )
     return _engine
 
 
@@ -187,45 +180,45 @@ def async_session_factory() -> AsyncSession:
     """
     if _async_session_factory is None:
         raise RuntimeError(
-    "Session factory has not been initialised. "
-    "Ensure init_db_engine() is called during application startup."
-    )
+            "Session factory has not been initialised. "
+            "Ensure init_db_engine() is called during application startup."
+        )
     return _async_session_factory()
-
 
     # ══════════════════════════════════════════════════════════════════════════════
     #  FastAPI dependency — request-scoped session
     # ══════════════════════════════════════════════════════════════════════════════
 
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    FastAPI dependency that yields one AsyncSession per request.
+        FastAPI dependency that yields one AsyncSession per request.
 
-    Usage in a route:
-from db.session import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
+        Usage in a route:
+    from db.session import get_db
+    from sqlalchemy.ext.asyncio import AsyncSession
 
-        @router.get("/example")
-        async def example(db: AsyncSession = Depends(get_db)):
-            result = await db.execute(select(User))
-            ...
+            @router.get("/example")
+            async def example(db: AsyncSession = Depends(get_db)):
+                result = await db.execute(select(User))
+                ...
 
-            Transaction behaviour:
-                - A transaction begins implicitly on the first DB operation
-                (autobegin=True on the session factory).
-                - The route or service function must call await db.commit()
-                to persist changes.
-                - If an exception propagates out of the route, the session
-                is rolled back automatically in the finally block below.
-                - The session is always closed (returned to the pool) in the
-            finally block, regardless of success or failure.
+                Transaction behaviour:
+                    - A transaction begins implicitly on the first DB operation
+                    (autobegin=True on the session factory).
+                    - The route or service function must call await db.commit()
+                    to persist changes.
+                    - If an exception propagates out of the route, the session
+                    is rolled back automatically in the finally block below.
+                    - The session is always closed (returned to the pool) in the
+                finally block, regardless of success or failure.
 
-            Why not auto-commit here:
-                Auto-committing in the dependency would silently commit partial
-                writes if a service function raises after some writes succeed.
-                Explicit commits in service functions make transaction boundaries
-                visible and intentional.
-                """
+                Why not auto-commit here:
+                    Auto-committing in the dependency would silently commit partial
+                    writes if a service function raises after some writes succeed.
+                    Explicit commits in service functions make transaction boundaries
+                    visible and intentional.
+    """
     if _async_session_factory is None:
         raise RuntimeError(
             "Session factory is not initialised. "
@@ -241,7 +234,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
         finally:
             await session.close()
 
-
     # ══════════════════════════════════════════════════════════════════════════════
     #  Utility — get a raw async connection for advanced operations
     # ══════════════════════════════════════════════════════════════════════════════
@@ -256,7 +248,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
             - DDL that must run outside a transaction
 
             For everything else use get_db().
-            """
+        """
         async with get_engine().connect() as conn:
             try:
                 yield conn
@@ -270,6 +262,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # ══════════════════════════════════════════════════════════════════════════════
 #  Alembic helpers — synchronous engine for migration runner
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def get_sync_engine():  # type: ignore[return]
     """
@@ -287,7 +280,5 @@ def get_sync_engine():  # type: ignore[return]
         # sequentially in a single process.
         poolclass=None,  # type: ignore[arg-type]
         echo=True,
-        connect_args={
-            "options": "-c timezone=UTC -c application_name=alembic"
-        },
+        connect_args={"options": "-c timezone=UTC -c application_name=alembic"},
     )

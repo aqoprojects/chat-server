@@ -3,7 +3,6 @@ from __future__ import annotations
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
 
-
 # Naming convention for all constraints.
 # This makes Alembic-generated migration names predictable and ensures
 # constraint names are consistent across databases.
@@ -20,13 +19,15 @@ NAMING_CONVENTION: dict[str, str] = {
 
 class Base(DeclarativeBase):
     """
-    Shared declarative base for all ORM models.
+        Shared declarative base for all ORM models.
 
-    All model files do:
-from db.base import Base
-class User(Base): ...
+        All model files do:
+    from db.base import Base
+    class User(Base): ...
 
-Alembic's env.py imports Base.metadata to discover all tables
-for autogenerate.
-"""
+    Alembic's env.py imports Base.metadata to discover all tables
+    for autogenerate.
+    """
+
+
 metadata = MetaData(naming_convention=NAMING_CONVENTION)

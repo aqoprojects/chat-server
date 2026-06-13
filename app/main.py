@@ -217,59 +217,90 @@ def _register_routers(app: FastAPI) -> None:
 
 def _register_health_endpoints(app: FastAPI) -> None:
     """
-    Lightweight health-check endpoints.
-    These are intentionally defined inline here (not in a separate router)
-    because they have no business logic and no authentication.
-    Kubernetes liveness and readiness probes hit these paths.
+    /health — liveness probe (process alive check, no dependencies).
+    /ready  — readiness probe (all dependency checks with latency).
     """
+    import time
+    from fastapi import status
     from fastapi.responses import ORJSONResponse
 
+    # ── /health — liveness ────────────────────────────────────────────────────
     @app.get(
         "/health",
         tags=["ops"],
-        summary="Liveness probe — is the process alive?",
+        summary="Liveness probe",
+        description=(
+            "Returns 200 as long as the Python process is running. "
+            "Does not check database or Redis. "
+            "Used by Kubernetes liveness probe."
+        ),
         include_in_schema=not settings.is_production,
+        response_model=None,
     )
     async def health_check() -> ORJSONResponse:
-        """
-        Returns 200 as long as the process is running.
-        Does NOT check database or Redis connectivity.
-        Used by Kubernetes liveness probe.
-        """
-        return ORJSONResponse({"status": "ok"})
+        return ORJSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "status": "ok",
+            "env": settings.app_env,
+        },
+        )
 
+    # ── /ready — readiness ────────────────────────────────────────────────────
     @app.get(
         "/ready",
         tags=["ops"],
-        summary="Readiness probe — are all dependencies reachable?",
+        summary="Readiness probe",
+        description=(
+            "Checks PostgreSQL and Redis connectivity. "
+            "Returns 200 only when all dependencies are reachable. "
+            "Returns 503 if any dependency is down. "
+            "Includes per-dependency latency in milliseconds. "
+            "Used by Kubernetes readiness probe."
+        ),
         include_in_schema=not settings.is_production,
+        response_model=None,
     )
+    
     async def readiness_check() -> ORJSONResponse:
-        """
-        Checks database and Redis connectivity.
-        Returns 200 only when both are reachable.
-        Returns 503 if either is down.
-        Used by Kubernetes readiness probe — the pod is removed from
-        the load balancer until this returns 200.
-        """
         from app.checks import check_db, check_redis
 
-        db_ok = await check_db()
-        redis_ok = await check_redis()
-
-        if db_ok and redis_ok:
-            return ORJSONResponse({"status": "ready", "db": "ok", "redis": "ok"})
-
-        from fastapi import status
-        return ORJSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={
-                "status": "not ready",
-                "db": "ok" if db_ok else "unreachable",
-                "redis": "ok" if redis_ok else "unreachable",
-            },
+        # Run both checks concurrently — no point waiting for DB
+        # if Redis is already failing or vice versa.
+        import asyncio
+        db_result, redis_result = await asyncio.gather(
+            check_db(),
+            check_redis(),
+            return_exceptions=False,
         )
 
+        all_ok: bool = db_result["ok"] and redis_result["ok"]
+
+        response_body = {
+            "status": "ready" if all_ok else "not_ready",
+            "env": settings.app_env,
+            "checks": {
+                "postgres": {
+                    "status": "ok" if db_result["ok"] else "fail",
+                    "latency_ms": db_result["latency_ms"],
+                    "detail": db_result["detail"],
+                },
+                "redis": {
+                    "status": "ok" if redis_result["ok"] else "fail",
+                    "latency_ms": redis_result["latency_ms"],
+                    "detail": redis_result["detail"],
+                },
+            },
+        }
+
+        return ORJSONResponse(
+        status_code=(
+            status.HTTP_200_OK
+            if all_ok
+            else status.HTTP_503_SERVICE_UNAVAILABLE
+        ),
+        content=response_body,
+        )
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Exception handlers
