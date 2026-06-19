@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
-    Boolean, DateTime, Enum, ForeignKey,
-    Index, Integer, String, Text, func,
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -14,12 +21,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db.base import Base
 
 if TYPE_CHECKING:
-    from db.models.token import RefreshToken, BlacklistedToken
-    from db.models.interest import UserInterest
-    from db.models.follow import Follow
-    from db.models.post import Post
     from db.models.chat import ChatParticipant
+    from db.models.follow import Follow
+    from db.models.interest import UserInterest
     from db.models.notification import Notification
+    from db.models.post import Post
+    from db.models.token import BlacklistedToken, RefreshToken
 
 
 class User(Base):
@@ -33,6 +40,7 @@ class User(Base):
         deleted_at IS NULL  → active account
         deleted_at IS NOT NULL → deleted account (hidden from all queries)
     """
+
     __tablename__ = "users"
 
     # ── Identity ──────────────────────────────────────────────────────────────
@@ -42,7 +50,7 @@ class User(Base):
         server_default=func.gen_random_uuid(),
     )
     email: Mapped[str] = mapped_column(
-        String(320),       # RFC 5321 max email length
+        String(320),  # RFC 5321 max email length
         unique=True,
         nullable=False,
         index=True,
@@ -77,11 +85,11 @@ class User(Base):
 
     # ── IP / registration metadata ────────────────────────────────────────────
     registered_ip: Mapped[Optional[str]] = mapped_column(
-        String(45),        # IPv6 max length
+        String(45),  # IPv6 max length
         nullable=True,
     )
     registered_country: Mapped[Optional[str]] = mapped_column(
-        String(2),         # ISO 3166-1 alpha-2
+        String(2),  # ISO 3166-1 alpha-2
         nullable=True,
     )
     registered_city: Mapped[Optional[str]] = mapped_column(
@@ -104,7 +112,7 @@ class User(Base):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
-        index=True,        # partial index below filters IS NULL quickly
+        index=True,  # partial index below filters IS NULL quickly
     )
     last_login_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
@@ -205,6 +213,7 @@ class UserProfile(Base):
     Separated from User so the auth table stays lean and cache-friendly.
     One UserProfile row per User row (1:1, created at registration).
     """
+
     __tablename__ = "user_profiles"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -311,6 +320,7 @@ class VerificationToken(Base):
     A new row replaces the previous one on resend — enforced by the
     unique constraint on user_id.
     """
+
     __tablename__ = "verification_tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -321,7 +331,7 @@ class VerificationToken(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
-        unique=True,          # one pending token per user at a time
+        unique=True,  # one pending token per user at a time
         nullable=False,
         index=True,
     )
@@ -333,7 +343,7 @@ class VerificationToken(Base):
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        index=True,           # Celery cleanup job: DELETE WHERE expires_at < now()
+        index=True,  # Celery cleanup job: DELETE WHERE expires_at < now()
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -342,8 +352,10 @@ class VerificationToken(Base):
     )
     used_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
-        nullable=True,        # set when the user successfully verifies
+        nullable=True,  # set when the user successfully verifies
     )
 
     def __repr__(self) -> str:
-        return f"<VerificationToken user_id={self.user_id} expires_at={self.expires_at}>"
+        return (
+            f"<VerificationToken user_id={self.user_id} expires_at={self.expires_at}>"
+        )

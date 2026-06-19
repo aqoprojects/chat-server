@@ -5,8 +5,11 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
-    DateTime, ForeignKey, Index,
-    UniqueConstraint, func,
+    DateTime,
+    ForeignKey,
+    Index,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -36,6 +39,7 @@ class Follow(Base):
         Unfollowing deletes the row. There is no history requirement for
         follow events. If history is needed later, add an event log table.
     """
+
     __tablename__ = "follows"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -77,19 +81,17 @@ class Follow(Base):
     __table_args__ = (
         # Prevent duplicate follow rows
         UniqueConstraint(
-            "follower_id", "following_id",
+            "follower_id",
+            "following_id",
             name="uq_follows_follower_following",
         ),
         # Prevent self-follows at DB level
         # CHECK (follower_id <> following_id)
         # Added as a raw DDL check constraint via Alembic in the migration.
-
         # Fast lookup: "who does user X follow?"
         Index("ix_follows_follower_id", "follower_id"),
-
         # Fast lookup: "who follows user X?"
         Index("ix_follows_following_id", "following_id"),
-
         # Composite index for mutual detection query:
         # SELECT 1 FROM follows
         # WHERE follower_id=$A AND following_id=$B

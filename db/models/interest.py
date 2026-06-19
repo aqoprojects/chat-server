@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
-    DateTime, ForeignKey, Index,
-    String, Text, UniqueConstraint, func,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -23,6 +28,7 @@ class Interest(Base):
     Seeded by scripts/seed_categories.py — not created by users.
     Examples: "Technology", "Sports", "Music", "Gaming".
     """
+
     __tablename__ = "interests"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -39,7 +45,7 @@ class Interest(Base):
         String(100),
         unique=True,
         nullable=False,
-        index=True,           # used in URL paths: /interests/technology
+        index=True,  # used in URL paths: /interests/technology
     )
     description: Mapped[Optional[str]] = mapped_column(
         Text,
@@ -47,7 +53,7 @@ class Interest(Base):
     )
     icon_name: Mapped[Optional[str]] = mapped_column(
         String(50),
-        nullable=True,        # icon identifier for the frontend
+        nullable=True,  # icon identifier for the frontend
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -73,6 +79,7 @@ class UserInterest(Base):
     One row per (user, interest) pair.
     Used to personalise content feeds and user search ranking.
     """
+
     __tablename__ = "user_interests"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -109,7 +116,8 @@ class UserInterest(Base):
     # ── Constraints & indexes ─────────────────────────────────────────────────
     __table_args__ = (
         UniqueConstraint(
-            "user_id", "interest_id",
+            "user_id",
+            "interest_id",
             name="uq_user_interests_user_interest",
         ),
         Index("ix_user_interests_user_id", "user_id"),

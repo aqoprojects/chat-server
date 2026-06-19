@@ -2,14 +2,21 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Index,
-    Integer, SmallInteger, String, Text,
-    UniqueConstraint, func,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
 )
-from sqlalchemy.dialects.postgresql import UUID, TSVECTOR
+from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base
@@ -30,6 +37,7 @@ class Post(Base):
         Content is replaced with NULL; a placeholder is shown to clients
         if FEATURE_SHOW_DELETED_PLACEHOLDER is enabled.
     """
+
     __tablename__ = "posts"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -45,7 +53,7 @@ class Post(Base):
     )
     content: Mapped[Optional[str]] = mapped_column(
         Text,
-        nullable=True,        # NULL after soft delete
+        nullable=True,  # NULL after soft delete
     )
     # Optional media attachment (image/video path relative to MEDIA_ROOT)
     media_path: Mapped[Optional[str]] = mapped_column(
@@ -53,7 +61,7 @@ class Post(Base):
         nullable=True,
     )
     media_type: Mapped[Optional[str]] = mapped_column(
-        String(20),           # "image" | "video" | None
+        String(20),  # "image" | "video" | None
         nullable=True,
     )
 
@@ -157,6 +165,7 @@ class Reply(Base):
         Full subtree (recursive): WITH RECURSIVE CTE on parent_id
         Subtree via path        : WHERE path LIKE 'root_uuid.target_uuid%'
     """
+
     __tablename__ = "replies"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -175,7 +184,7 @@ class Reply(Base):
     # service layer. The root_post_id FK ensures cascade delete.
     parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
-        nullable=True,        # NULL only for direct replies to the post
+        nullable=True,  # NULL only for direct replies to the post
         index=True,
     )
     author_id: Mapped[uuid.UUID] = mapped_column(
@@ -186,7 +195,7 @@ class Reply(Base):
     )
     content: Mapped[Optional[str]] = mapped_column(
         Text,
-        nullable=True,        # NULL after soft delete
+        nullable=True,  # NULL after soft delete
     )
     depth: Mapped[int] = mapped_column(
         SmallInteger,
@@ -288,6 +297,7 @@ class PostLike(Base):
         The unique constraints below prevent double-likes at the DB level.
         Redis also guards against double-likes before the DB write.
     """
+
     __tablename__ = "post_likes"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -333,12 +343,14 @@ class PostLike(Base):
     __table_args__ = (
         # A user can like a specific post only once
         UniqueConstraint(
-            "user_id", "post_id",
+            "user_id",
+            "post_id",
             name="uq_post_likes_user_post",
         ),
         # A user can like a specific reply only once
         UniqueConstraint(
-            "user_id", "reply_id",
+            "user_id",
+            "reply_id",
             name="uq_post_likes_user_reply",
         ),
         Index("ix_post_likes_post_id", "post_id"),

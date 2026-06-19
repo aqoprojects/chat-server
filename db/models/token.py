@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey,
-    Index, String, func,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -32,6 +36,7 @@ class RefreshToken(Base):
 
     family_id groups all refresh tokens from one login session.
     """
+
     __tablename__ = "refresh_tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -137,6 +142,7 @@ class BlacklistedToken(Base):
     Rows are automatically cleaned up by a Celery beat task that deletes
     rows WHERE expires_at < now() — keeping the table small.
     """
+
     __tablename__ = "blacklisted_tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -146,7 +152,7 @@ class BlacklistedToken(Base):
     )
     # jti = JWT ID claim — unique identifier per access token.
     jti: Mapped[str] = mapped_column(
-        String(36),           # UUID string length
+        String(36),  # UUID string length
         unique=True,
         nullable=False,
         index=True,
