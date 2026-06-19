@@ -445,3 +445,55 @@ def notification_idempotency_key(
     raw = f"{recipient_id}:{notification_type}:{entity_id}:{actor_id}"
     digest = hashlib.sha256(raw.encode()).hexdigest()
     return f"notif_idem:{digest}"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  WebSocket connection registry
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def ws_connection_key(user_id: str) -> str:
+    """
+    Tracks which server instance holds the user's active WebSocket connection.
+    TTL = settings.presence_ttl (60 seconds), sliding — refreshed on heartbeat.
+    Deleted immediately on WebSocket disconnect.
+
+    Value: server instance identifier string ("local" in single-server dev,
+    pod name or host:port in multi-server Kubernetes deployment).
+
+    Example:
+        ws_connection_key("user-uuid")
+        → "ws_conn:user-uuid"
+    """
+    return f"ws_conn:{user_id}"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Search result cache
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def search_cache_key(query: str, country: str, user_id: str) -> str:
+    """
+    Short-lived cache for user search results (30 second TTL).
+
+    The cache key incorporates:
+        query   — the search string (lowercased)
+        country — the requesting user's country code (for location boosting)
+        user_id — the requesting user (mutual-follow boost is user-specific)
+
+        A 16-character hex prefix of the SHA-256 hash of (query + country)
+        is used to keep the key short while avoiding collisions for different
+        query strings.
+
+        Example:
+            search_cache_key("john", "NG", "user-uuid")
+            → "search:a3f2b1c0d4e5f678:user-uuid"
+    """
+
+
+    import hashlib
+
+    raw = f"{query.lower()}:{country.upper()}"
+    query_hash = hashlib.sha256(raw.encode()).hexdigest()[:16]
+    return f"search:{query_hash}:{user_id}"
