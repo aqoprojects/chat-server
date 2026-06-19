@@ -1,28 +1,33 @@
 """${message}
 
 Revision ID: ${up_revision}
-Revises: ${down_revision | comma,n}
-Create Date: ${create_date}
+Revises:     ${down_revision | comma,n}
+Create date: ${create_date}
 
+Description:
+    <fill in what this migration does and why>
+
+Affected tables:
+    <list tables created, altered, or dropped>
 """
+from __future__ import annotations
+
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
 ${imports if imports else ""}
 
-# revision identifiers, used by Alembic.
+# ── Revision identifiers ──────────────────────────────────────────────────────
 revision: str = ${repr(up_revision)}
-down_revision: Union[str, Sequence[str], None] = ${repr(down_revision)}
+down_revision: Union[str, None] = ${repr(down_revision)}
 branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
 depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
     ${upgrades if upgrades else "pass"}
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
     ${downgrades if downgrades else "pass"}

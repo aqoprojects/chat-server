@@ -83,7 +83,7 @@ class User(Base):
         server_default="false",
     )
 
-    # ── IP / registration metadata ────────────────────────────────────────────
+    # ── IP / registration meta_data ────────────────────────────────────────────
     registered_ip: Mapped[Optional[str]] = mapped_column(
         String(45),  # IPv6 max length
         nullable=True,

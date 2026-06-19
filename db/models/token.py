@@ -70,7 +70,7 @@ class RefreshToken(Base):
         server_default="false",
         index=True,
     )
-    # Device/client metadata — optional, for session management UI
+    # Device/client meta_data — optional, for session management UI
     user_agent: Mapped[Optional[str]] = mapped_column(
         String(500),
         nullable=True,

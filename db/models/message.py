@@ -27,7 +27,7 @@ class MessageType(str, enum.Enum):
     text       — plain text message
     image      — image attachment (path in attachment_path)
     file       — generic file attachment
-    voice      — voice message (duration + waveform in metadata JSONB)
+    voice      — voice message (duration + waveform in meta_data JSONB)
     system     — system-generated event (member joined, left, muted, etc.)
                  These are never sent by users — only by the server.
     """
@@ -63,7 +63,7 @@ class Message(Base):
         attachment_path → image / file messages
         attachment_name → original filename for file messages
         attachment_size → bytes, for file messages
-        metadata JSONB  → voice (duration_seconds, waveform array),
+        meta_data JSONB  → voice (duration_seconds, waveform array),
                           system (event_type, actor_id, target_id),
                           E2E (key_id, encrypted_payload_hash)
 
@@ -73,7 +73,7 @@ class Message(Base):
 
     E2E encryption:
         is_encrypted flag signals that `content` holds ciphertext.
-        The `metadata` JSONB holds key exchange identifiers.
+        The `meta_data` JSONB holds key exchange identifiers.
         Key material itself is never stored server-side.
 
     Edit tracking:
@@ -134,11 +134,11 @@ class Message(Base):
         nullable=True,
     )
 
-    # ── Type-specific metadata (JSONB) ────────────────────────────────────────
+    # ── Type-specific meta_data (JSONB) ────────────────────────────────────────
     # Voice:  {"duration_seconds": 12, "waveform": [0.1, 0.4, ...]}
     # System: {"event_type": "member_joined", "actor_id": "uuid", "target_id": "uuid"}
     # E2E:    {"key_id": "...", "algorithm": "AES-GCM"}
-    metadata: Mapped[Optional[dict]] = mapped_column(
+    meta_data: Mapped[Optional[dict]] = mapped_column(
         JSONB,
         nullable=True,
     )
