@@ -13,10 +13,10 @@ application uses. Never construct a Redis key string outside this file.
 
 from core.config import settings
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 #  Rate limiting
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def rate_limit_key(action: str, identifier: str) -> str:
     """
@@ -38,7 +38,7 @@ def rate_limit_key(action: str, identifier: str) -> str:
 
             rate_limit_key("post_create", "a1b2c3d4-...")
             → "rl:post_create:a1b2c3d4-..."
-            """
+    """
     return f"{settings.rate_limit_key_prefix}{action}:{identifier}"
 
 
@@ -52,13 +52,14 @@ def rate_limit_chat_key(action: str, user_id: str, chat_id: str) -> str:
     Example:
         rate_limit_chat_key("msg", "user-uuid", "chat-uuid")
         → "rl:msg:user-uuid:chat-uuid"
-        """
+    """
     return f"{settings.rate_limit_key_prefix}{action}:{user_id}:{chat_id}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Idempotency
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def idempotency_key(idempotency_id: str) -> str:
     """
@@ -70,13 +71,14 @@ def idempotency_key(idempotency_id: str) -> str:
     Example:
         idempotency_key("550e8400-e29b-41d4-a716-446655440000")
         → "idem:550e8400-e29b-41d4-a716-446655440000"
-        """
+    """
     return f"{settings.idempotency_key_prefix}{idempotency_id}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  JWT token blacklist
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def blacklist_key(jti: str) -> str:
     """
@@ -89,7 +91,7 @@ def blacklist_key(jti: str) -> str:
     Example:
         blacklist_key("abc123")
         → "bl:abc123"
-        """
+    """
     return f"{settings.jwt_blacklist_prefix}{jti}"
 
 
@@ -103,13 +105,14 @@ def refresh_family_key(family_id: str) -> str:
     Example:
         refresh_family_key("family-uuid")
         → "rt_family:family-uuid"
-        """
+    """
     return f"{settings.jwt_refresh_family_prefix}{family_id}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Email verification
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def verification_code_key(user_id: str) -> str:
     """
@@ -119,7 +122,7 @@ def verification_code_key(user_id: str) -> str:
     Example:
         verification_code_key("user-uuid")
         → "verify:user-uuid"
-        """
+    """
     return f"verify:{user_id}"
 
 
@@ -131,13 +134,14 @@ def verification_resend_key(user_id: str) -> str:
     Example:
         verification_resend_key("user-uuid")
         → "verify_cd:user-uuid"
-        """
+    """
     return f"verify_cd:{user_id}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  User cache
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def user_cache_key(user_id: str) -> str:
     """
@@ -147,7 +151,7 @@ def user_cache_key(user_id: str) -> str:
     Example:
         user_cache_key("user-uuid")
         → "user:user-uuid"
-        """
+    """
     return f"user:{user_id}"
 
 
@@ -159,7 +163,7 @@ def user_by_username_key(username: str) -> str:
     Example:
         user_by_username_key("john_doe")
         → "uname:john_doe"
-        """
+    """
     return f"uname:{username.lower()}"
 
 
@@ -171,13 +175,14 @@ def username_change_cooldown_key(user_id: str) -> str:
     Example:
         username_change_cooldown_key("user-uuid")
         → "uname_cd:user-uuid"
-        """
+    """
     return f"{settings.username_change_key_prefix}{user_id}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Online presence & last seen
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def presence_key(user_id: str) -> str:
     """
@@ -188,7 +193,7 @@ def presence_key(user_id: str) -> str:
     Example:
         presence_key("user-uuid")
         → "presence:user-uuid"
-        """
+    """
     return f"{settings.presence_key_prefix}{user_id}"
 
 
@@ -200,7 +205,7 @@ def last_seen_key(user_id: str) -> str:
     Example:
         last_seen_key("user-uuid")
         → "last_seen:user-uuid"
-        """
+    """
     return f"{settings.last_seen_key_prefix}{user_id}"
 
 
@@ -213,7 +218,7 @@ def dau_key(date_str: str) -> str:
     Example:
         dau_key("2025-06-01")
         → "dau:2025-06-01"
-        """
+    """
     return f"{settings.dau_key_prefix}{date_str}"
 
 
@@ -225,13 +230,14 @@ def user_online_duration_key(user_id: str, date_str: str) -> str:
     Example:
         user_online_duration_key("user-uuid", "2025-06-01")
         → "dur:user-uuid:2025-06-01"
-        """
+    """
     return f"dur:{user_id}:{date_str}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Chat & unread counts
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def chat_participants_key(chat_id: str) -> str:
     """
@@ -242,7 +248,7 @@ def chat_participants_key(chat_id: str) -> str:
     Example:
         chat_participants_key("chat-uuid")
         → "chat_p:chat-uuid"
-        """
+    """
     return f"chat_p:{chat_id}"
 
 
@@ -254,7 +260,7 @@ def user_chat_list_key(user_id: str) -> str:
     Example:
         user_chat_list_key("user-uuid")
         → "chat_list:user-uuid"
-        """
+    """
     return f"chat_list:{user_id}"
 
 
@@ -266,7 +272,7 @@ def unread_count_key(user_id: str, chat_id: str) -> str:
     Example:
         unread_count_key("user-uuid", "chat-uuid")
         → "unread:user-uuid:chat-uuid"
-        """
+    """
     return f"unread:{user_id}:{chat_id}"
 
 
@@ -279,7 +285,7 @@ def total_unread_key(user_id: str) -> str:
     Example:
         total_unread_key("user-uuid")
         → "total_unread:user-uuid"
-        """
+    """
     return f"total_unread:{user_id}"
 
 
@@ -291,13 +297,14 @@ def last_read_message_key(user_id: str, chat_id: str) -> str:
     Example:
         last_read_message_key("user-uuid", "chat-uuid")
         → "last_read:user-uuid:chat-uuid"
-        """
+    """
     return f"last_read:{user_id}:{chat_id}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Redis Streams
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def chat_stream_key(chat_id: str) -> str:
     """
@@ -307,7 +314,7 @@ def chat_stream_key(chat_id: str) -> str:
     Example:
         chat_stream_key("chat-uuid")
         → "stream:chat:chat-uuid"
-        """
+    """
     return f"stream:chat:{chat_id}"
 
 
@@ -319,13 +326,14 @@ def notification_stream_key(user_id: str) -> str:
     Example:
         notification_stream_key("user-uuid")
         → "stream:notif:user-uuid"
-        """
+    """
     return f"stream:notif:{user_id}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Posts & likes
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def post_cache_key(post_id: str) -> str:
     """
@@ -335,7 +343,7 @@ def post_cache_key(post_id: str) -> str:
     Example:
         post_cache_key("post-uuid")
         → "post:post-uuid"
-        """
+    """
     return f"post:{post_id}"
 
 
@@ -348,7 +356,7 @@ def post_like_count_key(post_id: str) -> str:
     Example:
         post_like_count_key("post-uuid")
         → "likes:post-uuid"
-        """
+    """
     return f"likes:{post_id}"
 
 
@@ -361,7 +369,7 @@ def user_liked_post_key(user_id: str, post_id: str) -> str:
     Example:
         user_liked_post_key("user-uuid", "post-uuid")
         → "liked:user-uuid:post-uuid"
-        """
+    """
     return f"liked:{user_id}:{post_id}"
 
 
@@ -369,12 +377,13 @@ def user_liked_post_key(user_id: str, post_id: str) -> str:
 #  Follower counts (Redis counters — periodically synced to DB)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def follower_count_key(user_id: str) -> str:
     """
     Example:
         follower_count_key("user-uuid")
         → "fc:user-uuid"
-        """
+    """
     return f"fc:{user_id}"
 
 
@@ -383,5 +392,56 @@ def following_count_key(user_id: str) -> str:
     Example:
         following_count_key("user-uuid")
         → "fg:user-uuid"
-        """
+    """
     return f"fg:{user_id}"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Notifications
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def notification_unread_count_key(user_id: str) -> str:
+    """
+    Total unread notification count for a user.
+    Incremented when a notification is created.
+    Decremented when mark-as-read is called.
+    Reset to 0 on mark-all-read.
+
+    Served from Redis for the notification bell badge.
+    Falls back to COUNT(*) FROM notifications WHERE
+    recipient_id=$id AND is_read=false on cache miss.
+
+    Example:
+        notification_unread_count_key("user-uuid")
+        → "notif_unread:user-uuid"
+    """
+    return f"notif_unread:{user_id}"
+
+
+def notification_idempotency_key(
+    recipient_id: str,
+    notification_type: str,
+    entity_id: str,
+    actor_id: str,
+) -> str:
+    """
+    Short-lived Redis key for notification deduplication.
+    TTL = 60 seconds (the idempotency window).
+
+    If this key exists in Redis, a duplicate notification was already
+    created within the last 60 seconds and the new one is suppressed.
+
+    The key is a SHA-256 hash of the four identifying fields,
+    stored as a 64-character hex string — identical to the
+    idempotency_key column in the notifications table.
+
+    Example:
+        notification_idempotency_key("uid", "mention", "msg-id", "actor-id")
+        → "notif_idem:sha256hex..."
+    """
+    import hashlib
+
+    raw = f"{recipient_id}:{notification_type}:{entity_id}:{actor_id}"
+    digest = hashlib.sha256(raw.encode()).hexdigest()
+    return f"notif_idem:{digest}"
