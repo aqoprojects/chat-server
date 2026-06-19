@@ -234,3 +234,260 @@ async def _evalsha_with_fallback(
 
         # Retry with the fresh SHA
         return await redis.evalsha(fresh_sha, len(keys), *keys, *args)   # type: ignore[no-untyped-call]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Per-user rate limit wrapper
+#  Higher-level API used by services and WebSocket handlers directly,
+#  without going through FastAPI Depends().
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Maps action name → (capacity_attr, rate_attr) on settings
+# Every action that has a rate limit must appear here.
+_ACTION_SETTINGS_MAP: dict[str, tuple[str, str]] = {
+    "register":      ("rate_limit_register_capacity",
+    "rate_limit_register_refill_rate"),
+    "verify":        ("rate_limit_verify_capacity",
+    "rate_limit_verify_refill_rate"),
+    "resend_verify": ("rate_limit_resend_verify_capacity",
+    "rate_limit_resend_verify_refill_rate"),
+    "login":         ("rate_limit_login_capacity",
+    "rate_limit_login_refill_rate"),
+    "refresh":       ("rate_limit_refresh_capacity",
+    "rate_limit_refresh_refill_rate"),
+    "profile_edit":  ("rate_limit_profile_edit_capacity",
+    "rate_limit_profile_edit_refill_rate"),
+    "follow":        ("rate_limit_follow_capacity",
+    "rate_limit_follow_refill_rate"),
+    "post_create":   ("rate_limit_post_create_capacity",
+    "rate_limit_post_create_refill_rate"),
+    "reply_create":  ("rate_limit_reply_create_capacity",
+    "rate_limit_reply_create_refill_rate"),
+    "like":          ("rate_limit_like_capacity",
+    "rate_limit_like_refill_rate"),
+    "search":        ("rate_limit_search_capacity",
+    "rate_limit_search_refill_rate"),
+    "msg_global":    ("rate_limit_message_global_capacity",
+    "rate_limit_message_global_refill_rate"),
+    "msg_chat":      ("rate_limit_message_per_chat_capacity",
+    "rate_limit_message_per_chat_refill_rate"),
+    "interest":      ("rate_limit_interest_capacity",
+    "rate_limit_interest_refill_rate"),
+}
+
+
+async def enforce_rate_limit(
+    redis: Redis,
+    *,
+    action: str,
+    user_id: str | None = None,
+    ip_address: str | None = None,
+    requested: float = 1.0,
+) -> RateLimitResult:
+    """
+    High-level rate limit enforcer that resolves settings automatically.
+
+    Selects the identifier based on authentication state:
+        - user_id provided   → authenticated, rate-limit by user UUID
+        - ip_address provided → unauthenticated, rate-limit by IP
+        - both provided      → user_id takes precedence
+
+        Looks up capacity and rate from settings via _ACTION_SETTINGS_MAP.
+        Raises RateLimitExceededError if the limit is exceeded (same as
+        check_rate_limit — propagates to the global exception handler).
+
+        Args:
+            redis      : Redis client (from get_redis dependency or directly).
+            action     : Action label — must be a key in _ACTION_SETTINGS_MAP.
+            user_id    : Authenticated user UUID string (preferred identifier).
+            ip_address : Client IP string (fallback for pre-auth endpoints).
+            requested  : Token cost of this request (default 1.0).
+
+            Returns:
+                RateLimitResult(allowed=True, remaining, retry_after=0)
+                (Denied requests raise RateLimitExceededError, never return False)
+
+                Example (in a service function):
+                    await enforce_rate_limit(redis, action="post_create", user_id=str(user.id))
+
+                    Example (in a WebSocket handler, no Depends() available):
+                        await enforce_rate_limit(redis, action="msg_global", user_id=str(user_id))
+                        """
+    if action not in _ACTION_SETTINGS_MAP:
+        raise ValueError(
+            f"Unknown rate limit action: '{action}'. "
+            f"Add it to _ACTION_SETTINGS_MAP in cache/rate_limit.py."
+        )
+
+    capacity_attr, rate_attr = _ACTION_SETTINGS_MAP[action]
+    capacity = float(getattr(settings, capacity_attr))
+    rate     = float(getattr(settings, rate_attr))
+
+    # Resolve identifier — user_id beats IP
+    identifier = user_id if user_id else ip_address
+    if not identifier:
+        raise ValueError(
+            "enforce_rate_limit requires either user_id or ip_address."
+        )
+
+    return await check_rate_limit(
+        redis,
+        action=action,
+        identifier=identifier,
+        capacity=capacity,
+        rate=rate,
+        requested=requested,
+    )
+
+
+async def enforce_chat_rate_limit(
+    redis: Redis,
+    *,
+    user_id: str,
+    chat_id: str,
+    requested: float = 1.0,
+) -> RateLimitResult:
+    """
+    Per-chat message rate limit enforcer.
+
+    Convenience wrapper around check_chat_rate_limit() that pulls
+    capacity and rate from settings automatically.
+
+    Used by the WebSocket message handler and the REST message send endpoint.
+
+    Example:
+        await enforce_chat_rate_limit(redis, user_id=str(uid), chat_id=str(cid))
+        """
+    return await check_chat_rate_limit(
+        redis,
+        user_id=user_id,
+        chat_id=chat_id,
+        capacity=float(settings.rate_limit_message_per_chat_capacity),
+        rate=float(settings.rate_limit_message_per_chat_refill_rate),
+        requested=requested,
+    )
+
+
+from fastapi.responses import Response as FastAPIResponse
+
+def apply_rate_limit_headers(
+    response: FastAPIResponse,
+    result: RateLimitResult,
+    capacity: int,
+) -> None:
+    """
+    Attach standard rate limit headers to an HTTP response.
+
+    Headers added:
+        X-RateLimit-Limit     : Maximum requests allowed in the window
+        X-RateLimit-Remaining : Requests remaining in the current window
+        X-RateLimit-Retry-After: Seconds to wait before retrying (0 if allowed)
+
+        These headers follow the IETF draft-ietf-httpapi-ratelimit-headers spec.
+        Frontend clients should read X-RateLimit-Remaining and back off
+        proactively when it approaches 0, rather than waiting for a 429.
+
+        Called from route handlers after a successful rate limit check:
+
+            result = await enforce_rate_limit(redis, action="post_create", user_id=uid)
+            apply_rate_limit_headers(response, result, capacity=settings.rate_limit_post_create_capacity)
+            """
+    response.headers["X-RateLimit-Limit"]       = str(capacity)
+    response.headers["X-RateLimit-Remaining"]   = str(result.remaining)
+    response.headers["X-RateLimit-Retry-After"] = str(result.retry_after)
+
+
+
+import re
+
+# Compiled once at module load — not per request
+_SPAM_PATTERNS: list[re.Pattern[str]] = [
+    # Repeated single character runs (aaaaaaa, 1111111)
+    re.compile(r'(.)\1{9,}', re.UNICODE),
+    # Repeated word spam (buy buy buy buy buy)
+    re.compile(r'\b(\w+)(\s+\1){4,}\b', re.IGNORECASE | re.UNICODE),
+    # ALL CAPS long strings (shouting)
+    re.compile(r'[A-Z\s]{30,}'),
+    # Excessive punctuation
+    re.compile(r'[!?]{5,}'),
+    # URL spam — more than 3 URLs in one message
+    re.compile(r'(https?://\S+\s*){4,}', re.IGNORECASE),
+]
+
+
+def is_spam_content(content: str) -> bool:
+    """
+    Quick pattern-based spam detection for message content.
+
+    Runs synchronously — no I/O. Called before the token bucket check
+    so spam is rejected without consuming a rate limit token.
+
+    Detected patterns:
+        - Character repetition runs (10+ same char)
+        - Word repetition spam (5+ same word in sequence)
+        - ALL CAPS messages (30+ characters)
+        - Excessive punctuation (5+ ! or ? in a row)
+        - URL flooding (4+ URLs in one message)
+
+        Returns True if content looks like spam, False if clean.
+
+        Content moderation hooks (Celery tasks) run a deeper analysis
+        asynchronously after the message is stored — this is only a
+        fast first-pass filter.
+        """
+    if not content or not content.strip():
+        return False
+
+    for pattern in _SPAM_PATTERNS:
+        if pattern.search(content):
+            return True
+
+        return False
+
+
+async def enforce_message_rate_limits(
+    redis: Redis,
+    *,
+    user_id: str,
+    chat_id: str,
+    content: str,
+) -> None:
+    """
+    Combined message rate limit enforcement for chat message sends.
+
+    Runs three checks in order:
+        1. Spam content detection (synchronous, no Redis I/O)
+        2. Global per-user message rate limit
+        3. Per-chat per-user message rate limit
+
+        Raises RateLimitExceededError on any violation.
+        Called from the message service before writing to DB or Redis Stream.
+
+        Args:
+            redis    : Redis client.
+            user_id  : Sender's user UUID string.
+            chat_id  : Target chat UUID string.
+            content  : Message content string (for spam detection).
+            """
+    from core.exceptions import BadRequestError
+
+    # 1. Spam detection (fast, no I/O)
+    if content and is_spam_content(content):
+        raise BadRequestError(
+            "Your message was flagged as spam. "
+            "Please avoid repetitive content."
+        )
+
+    # 2. Global per-user rate limit
+    await enforce_rate_limit(
+        redis,
+        action="msg_global",
+        user_id=user_id,
+    )
+
+    # 3. Per-chat rate limit
+    await enforce_chat_rate_limit(
+        redis,
+        user_id=user_id,
+        chat_id=chat_id,
+    )
