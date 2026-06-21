@@ -58,6 +58,4 @@ docker-compose.override.yml
 # ── OS ────────────────────────────────────────────────────
 .DS_Store
 ehthumbs.db
-
-indexesTable
-
+celeryError.txt
