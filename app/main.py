@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from core.config import settings
-# from core.logging.setup import configure_logging
+from core.logging.setup import configure_logging
 
 # ── Routers (imported here; files are empty stubs until their phase) ──────────
 from app.api.v1 import (
@@ -25,7 +25,7 @@ from app.api.v1 import (
 )
 from app.ws.router import ws_router
 # from app.middleware.request_id import RequestIDMiddleware
-# from app.middleware.request_size import RequestSizeMiddleware
+from app.middleware.request_size import RequestSizeMiddleware
 # from app.middleware.security_headers import SecurityHeadersMiddleware
 # from app.middleware.csrf import CSRFMiddleware
 from app.lifespan import lifespan
@@ -45,7 +45,7 @@ def create_app() -> FastAPI:
     """
 
     # ── 1. Configure structlog before anything else logs ─────────────────────
-    # configure_logging()
+    configure_logging()
 
     # ── 2. Instantiate FastAPI ────────────────────────────────────────────────
     application = FastAPI(
@@ -63,9 +63,16 @@ def create_app() -> FastAPI:
         default_response_class=_get_default_response_class(),
     )
 
+
     # ── 3. Register middleware (bottom = outermost, processed first) ──────────
     _register_middleware(application)
 
+    # from app.middleware.request_size import RequestSizeMiddleware
+    # app.add_middleware(
+    #     RequestSizeMiddleware,
+    #     max_size=settings.max_upload_size_bytes,
+    # )
+    
     # ── 4. Mount versioned API routers ───────────────────────────────────────
     _register_routers(application)
 
@@ -121,10 +128,10 @@ def _register_middleware(app: FastAPI) -> None:
     # app.add_middleware(CSRFMiddleware)
 
     # 4 — RequestSizeMiddleware (custom — implemented in Stage 7)
-    # app.add_middleware(
-    #     # RequestSizeMiddleware,
-    #     max_size=settings.max_upload_size_bytes,
-    # )
+    app.add_middleware(
+    RequestSizeMiddleware,
+    max_size=settings.max_upload_size_bytes,
+    )
 
     # 3 — RequestIDMiddleware (custom — implemented in Stage 4)
     # app.add_middleware(RequestIDMiddleware)
@@ -463,4 +470,5 @@ def _get_default_response_class() -> type:
 #
 # Tests do NOT import this directly — they call create_app() themselves
 # so they get a fresh instance with overridden dependencies.
+
 app: FastAPI = create_app()
